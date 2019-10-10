@@ -904,12 +904,21 @@ def getTokenLists(sourceId, book):
     rst = cursor.fetchone()
     cursor.execute("select book_id from bible_books_look_up where book_code=%s", (book,))
     bookId = cursor.fetchone()[0]
-    tablename = '_'.join(rst[0].split('_')[0:3]) + '_tokens'
     tablename = rst[0].split('_')
+    languageCode = tablename[0]
+    version = tablename[1]+"_"+tablename[2]
     tablename.pop(-1)
     tablename = '_'.join(tablename) + '_tokens'
     cursor.execute("select token from " + tablename + " where book_id=%s", (bookId,))
     tokenList = [item[0] for item in cursor.fetchall()]
+    if len(tokenList) == 0:
+        try:
+            phrases.tokenize(connection, languageCode.lower(), version.lower() , bookId)
+            cursor.execute("select token from " + tablename + " where book_id=%s", (bookId,))
+            tokenList = [item[0] for item in cursor.fetchall()]
+        except Exception as ex:
+            return '{"success":false, "message":"Phrases method error"}'
+
     cursor.close()
     return json.dumps(tokenList)
 
@@ -983,38 +992,6 @@ def getLanguages(contentId):
     } for languageName, languageCode, languageId in rst]
     return json.dumps(languages)
 
-@app.route("/v1/versiondetails", methods=["GET"], defaults={'contentId': None,'languageId':None})
-@app.route("/v1/versiondetails/<contentId>/<languageId>", methods=["GET"])
-def getVersionDetails(contentId, languageId):
-    connection = get_db()
-    cursor = connection.cursor()
-    if languageId:
-        cursor.execute("select s.source_id, s.version_content_code, s.version_content_description, s.year, \
-            s.license, s.revision, c.content_type, l.language_name from sources s left join \
-                content_types c on s.content_id=c.content_id left join languages l on \
-                    s.language_id=l.language_id where s.content_id=%s and s.language_id=%s", (\
-                        contentId, languageId))
-    else:
-
-        cursor.execute("select s.source_id, s.version_content_code, s.version_content_description, s.year, \
-            s.license, s.revision, c.content_type, l.language_name from sources s left join \
-                content_types c on s.content_id=c.content_id left join languages l on \
-                    s.language_id=l.language_id",)
-    rst = cursor.fetchall()
-    version_details = [
-        {
-            "sourceId":sourceId,
-            "versionContentDescription":versioncontentdescription,
-            "versionContentCode":versioncontentcode,
-            "year":year,
-            "license":license,
-            "revision": revision,
-            "contentType":contenttype,
-            "languageName":languagename,
-        } for sourceId, versioncontentcode, versioncontentdescription, year, license, revision, contenttype, languagename in rst
-    ]
-    cursor.close()
-    return json.dumps(version_details)
 
 @app.route("/v1/languages", methods=["GET"])
 def getAllLanguages():
@@ -1047,17 +1024,6 @@ def getContentDetails():
     cursor.close()
     return json.dumps(allContentTypeData)
 
-def getTokens(text):
-    crossRefPattern = re.compile(r'(\(?(\d+\s)?\S+\s\d+:\d+\,?\)?)')
-    footNotesPattern = re.compile(r'\it(.*)\s?\\f\s?\+.*\\ft\s?(.*)\s?\\f\*\\it\*\*')
-    content = re.sub(crossRefPattern, '', text)
-    content = re.sub(footNotesPattern, '', content)
-    content = re.sub(r'([!\"#$%&\\\'\(\)\*\+,\.\/:;<=>\?\@\[\]^_`{|\}~\”\“\‘\’।0123456789])',"",content)
-    content = re.sub(r'\n', ' ', content)
-    content = content.strip()
-    tokenSet = set(content.split(' '))
-    # tokenList = list(tokenSet)
-    return tokenSet
 
 def parsePunctuations(text):
     content = re.sub(r'([!\"#$%&\\\'\(\)\*\+,\.\/:;<=>\?\@\[\]^_`{|\}~\”\“\‘\’।0123456789])',"",text)
@@ -1195,11 +1161,9 @@ def parseDataForDBInsert(usfmData):
             else:
                 print("!!!Unrecognized pattern in verse number!!!")
                 print("verseNumber:",verse['number'])
-    tokenList = list(getTokens(' '.join(verseContent)))
-    tokenList = [(bookId, token) for token in tokenList]
     # 
     print(dbInsertData[0])
-    return (dbInsertData, tokenList, bookId)
+    return (dbInsertData, bookId)
 
 def createTableCommand(fields, tablename):
     command = 'CREATE TABLE %s (%s)' %(tablename, ', '.join(fields))
@@ -1288,7 +1252,7 @@ def uploadSource():
         # except Exception as ex:
         #     return '{"success":false, "message":"' + str(ex) + '"}'
         print('befire parse')
-        parsedDbData, tokenDBData, bookId = parseDataForDBInsert(parsedUsfmText)
+        parsedDbData, bookId = parseDataForDBInsert(parsedUsfmText)
         languageCode = rst[2]
         versionCode = rst[1]
         print(languageCode, versionCode)
@@ -1310,10 +1274,6 @@ def uploadSource():
         print(cleanTableName)
         cursor.execute('insert into ' + cleanTableName + ' (ref_id, verse, cross_reference, foot_notes) values '\
             + dataForDb)
-        try:
-            phrases.tokenize(connection, languageCode.lower(), version.lower() , bookId)
-        except Exception as ex:
-            return '{"success":false, "message":"Phrases method error"}'
         # cursor = connection.cursor()
         # version = rst[0]
         cursor.execute('update sources set usfm_text=%s where source_id=%s', (usfmText, sourceId))
