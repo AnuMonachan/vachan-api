@@ -86,15 +86,15 @@
 
 #
 # version: 2
-# jobs:
-#   build:   
-#     docker:
-#       - image: circleci/python:3.6.2-stretch-browsers
-#       working_directory: ~/vachan_api
-#       steps:
-#       - add_ssh_keys:
-#           fingerprints:
-#             - "86:7a:d7:56:16:50:91:55:7d:8b:27:68:8f:05:a7:f4"
+#   jobs:
+#     build:   
+#       docker:
+#         - image: circleci/python:3.6.2-stretch-browsers
+#         working_directory: ~/vachan_api
+#         steps:
+#         - add_ssh_keys:
+#             fingerprints:
+#               - "86:7a:d7:56:16:50:91:55:7d:8b:27:68:8f:05:a7:f4"
 #       - checkout
 
 #         environment:
@@ -174,40 +174,40 @@
       #     -c "SELECT * from test"
 
 version: 2
-jobs:
-  build:   
-    docker:
-      - image: circleci/python:3.6.2-stretch-browsers
-      working_directory: ~/vachan_api
-      steps:
-      - add_ssh_keys:
-          fingerprints:
-            - "86:7a:d7:56:16:50:91:55:7d:8b:27:68:8f:05:a7:f4"
-      - checkout
-      - run:
-          name: Setup
-          command: |
-            chmod 755 .circleci/deploy.sh
-            ssh-keyscan staging.autographamt.com >> ~/.ssh/known_hosts
-      - run: sudo apt-get update
-      - run: "sudo chown -R circleci:circleci /usr/local/bin"
-      - run: "sudo chown -R circleci:circleci /usr/local/lib/python3.6/site-packages"
-      - restore_cache: 
-          keys: 
-            - "v1-dependencies-{{ checksum \"requirements.txt\" }}"
-            - v1-dependencies-
-      - run: 
-          command: |
-              python3 -m venv venv
-              . venv/bin/activate
-              pip3 install -r requirements.txt
-          name: "install dependencies"
-      - save_cache: 
-          key: "v1-dependencies-{{ checksum \"requirements.txt\" }}"
-          paths: 
-            - ./venv
-            - /usr/local/bin
-            - /usr/local/lib/python3.6/site-packages
-      - run:
-          name: Deploy
-          command: ./.circleci/deploy.sh
+  jobs:
+    build:   
+      docker:
+        - image: circleci/python:3.6.2-stretch-browsers
+        working_directory: ~/vachan_api
+        steps:
+        - add_ssh_keys:
+            fingerprints:
+              - "86:7a:d7:56:16:50:91:55:7d:8b:27:68:8f:05:a7:f4"
+        - checkout
+        - run:
+            name: Setup
+            command: |
+              chmod 755 .circleci/deploy.sh
+              ssh-keyscan staging.autographamt.com >> ~/.ssh/known_hosts
+        - run: sudo apt-get update
+        - run: "sudo chown -R circleci:circleci /usr/local/bin"
+        - run: "sudo chown -R circleci:circleci /usr/local/lib/python3.6/site-packages"
+        - restore_cache: 
+            keys: 
+              - "v1-dependencies-{{ checksum \"requirements.txt\" }}"
+              - v1-dependencies-
+        - run: 
+            command: |
+                python3 -m venv venv
+                . venv/bin/activate
+                pip3 install -r requirements.txt
+            name: "install dependencies"
+        - save_cache: 
+            key: "v1-dependencies-{{ checksum \"requirements.txt\" }}"
+            paths: 
+              - ./venv
+              - /usr/local/bin
+              - /usr/local/lib/python3.6/site-packages
+        - run:
+            name: Deploy
+            command: ./.circleci/deploy.sh
