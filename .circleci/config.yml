@@ -84,70 +84,74 @@
 #         store_artifacts: 
 #           path: test-reports
 
+#
+# version: 2
+# jobs:
+#   build:   
+#     docker:
+#       - image: circleci/python:3.6.2-stretch-browsers
+#       working_directory: ~/vachan_api
+#       steps:
+#       - add_ssh_keys:
+#           fingerprints:
+#             - "86:7a:d7:56:16:50:91:55:7d:8b:27:68:8f:05:a7:f4"
+#       - checkout
 
-version: 2
-jobs:
-  build:
-    
-    # Primary container image where all commands run
-    docker:
-      - image: circleci/python:3.6.2-stretch-browsers
-        environment:
-          TEST_DATABASE_URL: postgresql://postgres@localhost:5432/postgres
-          AGMT_POSTGRES_DATABASE: postgres
-          AGMT_HS256_SECRET: x709myFlW5
-    # Service container image
-      - image: circleci/postgres:9.6.5-alpine-ram
-
-    filters: 
-      branches: 
-        only: 
-          - master
-          - staging
+#         environment:
+#           TEST_DATABASE_URL: postgresql://postgres@localhost:5432/postgres
+#           AGMT_POSTGRES_DATABASE: postgres
+#           AGMT_HS256_SECRET: x709myFlW5
+#         # Service container image
+#       - image: circleci/postgres:9.6.5-alpine-ram
+#     filters: 
+#       branches: 
+#         only: 
+#           - master
+#           - staging
         
-    steps:
-      - checkout
-      - run: sudo apt-get update
-      - run: sudo apt-get install postgresql-client-9.6
-      - run: whoami
-      - run: "sudo chown -R circleci:circleci /usr/local/bin"
-      - run: "sudo chown -R circleci:circleci /usr/local/lib/python3.6/site-packages"
+#     steps:
+#       - checkout
+#       - run: sudo apt-get update
+#       - run: sudo apt-get install postgresql-client-9.6
+#       - run: whoami
+#       - run: "sudo chown -R circleci:circleci /usr/local/bin"
+#       - run: "sudo chown -R circleci:circleci /usr/local/lib/python3.6/site-packages"
 
-      - restore_cache: 
-          keys: 
-            - "v1-dependencies-{{ checksum \"requirements.txt\" }}"
-            - v1-dependencies-
-      - run: 
-          command: |
-              python3 -m venv venv
-              . venv/bin/activate
-              pip3 install -r requirements.txt
-          name: "install dependencies"
+#       - restore_cache: 
+#           keys: 
+#             - "v1-dependencies-{{ checksum \"requirements.txt\" }}"
+#             - v1-dependencies-
+#       - run: 
+#           command: |
+#               python3 -m venv venv
+#               . venv/bin/activate
+#               pip3 install -r requirements.txt
+#           name: "install dependencies"
 
-      - save_cache: 
-          key: "v1-dependencies-{{ checksum \"requirements.txt\" }}"
-          paths: 
-            - ./venv
-            - /usr/local/bin
-            - /usr/local/lib/python3.6/site-packages
+#       - save_cache: 
+#           key: "v1-dependencies-{{ checksum \"requirements.txt\" }}"
+#           paths: 
+#             - ./venv
+#             - /usr/local/bin
+#             - /usr/local/lib/python3.6/site-packages
 
-      - run: 
-          command: |
-              . venv/bin/activate
-              mkdir test-reports
-              # pytest --junitxml=test-reports/junit.xml
+#       - run: 
+#           command: |
+#               . venv/bin/activate
+#               mkdir test-reports
+#               # pytest --junitxml=test-reports/junit.xml
               
-              python3 -m pytest test/test_signin.py
-              python3 -m pytest test/test_availablebooks.py
-              python3 -m pytest test/test_bibleversetext.py
-              python3 -m pytest test/test_bibleversetext2.py
-          name: "run tests"
+#               python3 -m pytest test/test_signin.py
+#               python3 -m pytest test/test_availablebooks.py
+#               python3 -m pytest test/test_bibleversetext.py
+#               python3 -m pytest test/test_bibleversetext2.py
+#           name: "run tests"
       
-      - store_test_results: 
-          path: test-reports
+#       - store_test_results: 
+#           path: test-reports
 
-      - store_artifacts: 
-          path: test-reports
+#       - store_artifacts: 
+#           path: test-reports
           
       # - run: psql -h 127.0.0.1 -U postgres postgres < dump/vachan_engine_local6nov2019.sql
 
@@ -168,3 +172,42 @@ jobs:
       #     psql \
       #     -d $TEST_DATABASE_URL \
       #     -c "SELECT * from test"
+
+version: 2
+jobs:
+  build:   
+    docker:
+      - image: circleci/python:3.6.2-stretch-browsers
+      working_directory: ~/vachan_api
+      steps:
+      - add_ssh_keys:
+          fingerprints:
+            - "86:7a:d7:56:16:50:91:55:7d:8b:27:68:8f:05:a7:f4"
+      - checkout
+      - run:
+          name: Setup
+          command: |
+            chmod 755 .circleci/deploy.sh
+            ssh-keyscan staging.autographamt.com >> ~/.ssh/known_hosts
+      - run: sudo apt-get update
+      - run: "sudo chown -R circleci:circleci /usr/local/bin"
+      - run: "sudo chown -R circleci:circleci /usr/local/lib/python3.6/site-packages"
+      - restore_cache: 
+          keys: 
+            - "v1-dependencies-{{ checksum \"requirements.txt\" }}"
+            - v1-dependencies-
+      - run: 
+          command: |
+              python3 -m venv venv
+              . venv/bin/activate
+              pip3 install -r requirements.txt
+          name: "install dependencies"
+      - save_cache: 
+          key: "v1-dependencies-{{ checksum \"requirements.txt\" }}"
+          paths: 
+            - ./venv
+            - /usr/local/bin
+            - /usr/local/lib/python3.6/site-packages
+      - run:
+          name: Deploy
+          command: ./.circleci/deploy.sh
